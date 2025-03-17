@@ -1,27 +1,31 @@
 const socket = io();
 const video = document.getElementById("videoPlayer");
 
-socket.on("video_changed", (data) => {
-    const timestamp = new Date().getTime();
-    video.src = data.video_url + "?t=" + timestamp;
-    video.load();
-    video.play().catch(err => console.log("Автовоспроизведение заблокировано:", err));
-});
+// Время для синхронизации (например, 1 секунда)
+const syncInterval = 1000;
+let lastSyncTime = 0;
 
 // Отправка данных о состоянии видео
 function sendSyncEvent(event) {
-    socket.emit("sync_video", {
-        action: event.type,
-        currentTime: video.currentTime,
-        playing: !video.paused
-    });
+    // Проверка, что прошло достаточно времени для следующей синхронизации
+    if (new Date().getTime() - lastSyncTime >= syncInterval) {
+        socket.emit("sync_video", {
+            action: event.type,
+            currentTime: video.currentTime,
+            playing: !video.paused
+        });
+        lastSyncTime = new Date().getTime();
+    }
 }
 
 // Обработка изменений у других пользователей
 socket.on("sync_video", (data) => {
     if (data.action === "play") {
+        // Если видео не на паузе, не делаем ничего
+        if (video.paused) {
+            video.play();
+        }
         video.currentTime = data.currentTime;
-        video.play();
     } else if (data.action === "pause") {
         video.pause();
     } else if (data.action === "seeked") {
