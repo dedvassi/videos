@@ -2,32 +2,34 @@ const socket = io();
 const video = document.getElementById("videoPlayer");
 
 socket.on("video_changed", (data) => {
-    video.src = data.src;
+    const timestamp = new Date().getTime();
+    video.src = data.video_url + "?t=" + timestamp;
     video.load();
-    video.play();
+    video.play().catch(err => console.log("Автовоспроизведение заблокировано:", err));
 });
 
-// Обновляем состояние видео при изменении
-video.addEventListener("play", () => {
-    socket.emit("sync_video", { time: video.currentTime, paused: false });
-});
+// Отправка данных о состоянии видео
+function sendSyncEvent(event) {
+    socket.emit("sync_video", {
+        action: event.type,
+        currentTime: video.currentTime,
+        playing: !video.paused
+    });
+}
 
-video.addEventListener("pause", () => {
-    socket.emit("sync_video", { time: video.currentTime, paused: true });
-});
-
-video.addEventListener("seeked", () => {
-    socket.emit("sync_video", { time: video.currentTime, paused: video.paused });
-});
-
-// Синхронизируем видео у всех
+// Обработка изменений у других пользователей
 socket.on("sync_video", (data) => {
-    if (Math.abs(video.currentTime - data.time) > 0.5) {
-        video.currentTime = data.time;
-    }
-    if (data.paused) {
-        video.pause();
-    } else {
+    if (data.action === "play") {
+        video.currentTime = data.currentTime;
         video.play();
+    } else if (data.action === "pause") {
+        video.pause();
+    } else if (data.action === "seeked") {
+        video.currentTime = data.currentTime;
     }
 });
+
+// Подключение обработчиков событий
+video.addEventListener("play", sendSyncEvent);
+video.addEventListener("pause", sendSyncEvent);
+video.addEventListener("seeked", sendSyncEvent);
