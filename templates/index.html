@@ -12,7 +12,10 @@
     <button type="submit">Загрузить видео</button>
   </form>
   <br>
-  <video id="videoPlayer" controls width="640" height="360"></video>
+  <video id="videoPlayer" controls width="640" height="360">
+    <source src="/video_feed" type="video/mp4">
+    Ваш браузер не поддерживает видео.
+  </video>
 
   <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.5.4/socket.io.min.js"></script>
   <script src="{{ url_for('static', filename='main.js') }}"></script>

@@ -1,4 +1,4 @@
-from flask import Flask, render_template, request, redirect, url_for, send_from_directory, Response
+from flask import Flask, render_template, request, redirect, url_for, Response
 from flask_socketio import SocketIO, emit
 import os
 from werkzeug.utils import secure_filename
@@ -33,43 +33,27 @@ def upload_video():
     return redirect(url_for('index'))
 
 # Потоковая передача видео
-@app.route('/videos/<path:filename>')
-def video(filename):
-    video_path = os.path.join(app.config['UPLOAD_FOLDER'], filename)
-    file_size = os.path.getsize(video_path)
-    range_header = request.headers.get('Range', None)
+@app.route('/video_feed')
+def video_feed():
+    video_path = os.path.join(app.config['UPLOAD_FOLDER'], 'video.mp4')  # Используем загруженное видео
+    return Response(generate_video(video_path), {
+        'Content-Type': 'video/mp4',
+        'Accept-Ranges': 'bytes'
+    })
 
-    if range_header:
-        # Поддержка частичной загрузки (для потоковой передачи)
-        start, end = get_range(range_header, file_size)
-        with open(video_path, 'rb') as f:
-            f.seek(start)
-            data = f.read(end - start + 1)
-        response = Response(
-            data,
-            206,  # Partial Content
-            mimetype='video/mp4',
-            content_type='video/mp4',
-            direct_passthrough=True
-        )
-        response.headers.add('Content-Range', f'bytes {start}-{end}/{file_size}')
-        response.headers.add('Accept-Ranges', 'bytes')
-        return response
-    else:
-        # Полная загрузка видео
-        return send_from_directory(app.config['UPLOAD_FOLDER'], filename)
+# Генератор для потоковой передачи видео
+def generate_video(video_path):
+    with open(video_path, 'rb') as f:
+        while True:
+            chunk = f.read(1024 * 1024)  # Читаем по 1 МБ
+            if not chunk:
+                break
+            yield chunk
 
 # Обработка WebSocket событий
 @socketio.on('playbackAction')
 def handle_playback_action(data):
     emit('syncPlayback', data, broadcast=True, include_self=False)
-
-# Функция для обработки Range-заголовка
-def get_range(range_header, file_size):
-    start, end = range_header.replace('bytes=', '').split('-')
-    start = int(start)
-    end = int(end) if end else file_size - 1
-    return start, end
 
 if __name__ == '__main__':
     os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)

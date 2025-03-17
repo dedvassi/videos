@@ -15,7 +15,7 @@ uploadForm.addEventListener('submit', (e) => {
       body: formData,
     })
       .then(() => {
-        videoPlayer.src = `/videos/${file.name}`;
+        videoPlayer.src = '/video_feed';
         videoPlayer.play();
       })
       .catch((err) => console.error('Ошибка загрузки:', err));
