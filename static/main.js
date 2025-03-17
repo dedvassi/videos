@@ -1,48 +1,29 @@
-const socket = io(); // Подключение к WebSocket
-const videoPlayer = document.getElementById('videoPlayer');
-const uploadForm = document.getElementById('uploadForm');
-const fileInput = document.getElementById('fileInput');
+const socket = io();
+const video = document.getElementById("video");
 
-// Загрузка видео
-uploadForm.addEventListener('submit', (e) => {
-  e.preventDefault();
-  const file = fileInput.files[0];
-  if (file) {
-    const formData = new FormData();
-    formData.append('file', file);
-    fetch('/upload', {
-      method: 'POST',
-      body: formData,
-    })
-      .then(() => {
-        videoPlayer.src = '/video_feed';
-        videoPlayer.play();
-      })
-      .catch((err) => console.error('Ошибка загрузки:', err));
-  }
+socket.on("video_update", (data) => {
+    location.reload();  // Перезагружаем страницу при смене видео
 });
 
-// Синхронизация воспроизведения
-socket.on('syncPlayback', (data) => {
-  if (data.action === 'play') {
-    videoPlayer.currentTime = data.time;
-    videoPlayer.play();
-  } else if (data.action === 'pause') {
-    videoPlayer.pause();
-  } else if (data.action === 'seek') {
-    videoPlayer.currentTime = data.time;
-  }
+socket.on("sync", (data) => {
+    if (Math.abs(video.currentTime - data.time) > 0.5) {
+        video.currentTime = data.time;
+    }
+    if (data.state === "play" && video.paused) {
+        video.play();
+    } else if (data.state === "pause" && !video.paused) {
+        video.pause();
+    }
 });
 
-// Отправка событий воспроизведения на сервер
-videoPlayer.addEventListener('play', () => {
-  socket.emit('playbackAction', { action: 'play', time: videoPlayer.currentTime });
+video.addEventListener("play", () => {
+    socket.emit("sync", { time: video.currentTime, state: "play" });
 });
 
-videoPlayer.addEventListener('pause', () => {
-  socket.emit('playbackAction', { action: 'pause', time: videoPlayer.currentTime });
+video.addEventListener("pause", () => {
+    socket.emit("sync", { time: video.currentTime, state: "pause" });
 });
 
-videoPlayer.addEventListener('seeked', () => {
-  socket.emit('playbackAction', { action: 'seek', time: videoPlayer.currentTime });
+video.addEventListener("seeked", () => {
+    socket.emit("sync", { time: video.currentTime, state: video.paused ? "pause" : "play" });
 });

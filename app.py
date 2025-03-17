@@ -1,61 +1,40 @@
-from flask import Flask, render_template, request, redirect, url_for, Response
+from flask import Flask, render_template, request, redirect, url_for
 from flask_socketio import SocketIO, emit
 import os
-from werkzeug.utils import secure_filename
 
 app = Flask(__name__)
-app.config['SECRET_KEY'] = 'secret!'
-app.config['UPLOAD_FOLDER'] = 'uploads'
-app.config['ALLOWED_EXTENSIONS'] = {'mp4', 'webm', 'ogg'}
-socketio = SocketIO(app)
+socketio = SocketIO(app, cors_allowed_origins="*")
 
-# Проверка расширения файла
-def allowed_file(filename):
-    return '.' in filename and filename.rsplit('.', 1)[1].lower() in app.config['ALLOWED_EXTENSIONS']
+UPLOAD_FOLDER = "static/uploads"
+os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 
-# Главная страница
-@app.route('/')
+current_video = None
+video_time = 0  # Текущее время воспроизведения
+video_state = "play"  # play / pause
+
+@app.route("/")
 def index():
-    return render_template('index.html')
+    return render_template("index.html", video=current_video)
 
-# Загрузка видео
-@app.route('/upload', methods=['POST'])
-def upload_video():
-    if 'file' not in request.files:
-        return redirect(url_for('index'))
-    file = request.files['file']
-    if file.filename == '':
-        return redirect(url_for('index'))
-    if file and allowed_file(file.filename):
-        filename = secure_filename(file.filename)
-        file.save(os.path.join(app.config['UPLOAD_FOLDER'], filename))
-        return redirect(url_for('index'))
-    return redirect(url_for('index'))
+@app.route("/upload", methods=["POST"])
+def upload():
+    global current_video, video_time, video_state
+    if "video" in request.files:
+        file = request.files["video"]
+        filepath = os.path.join(UPLOAD_FOLDER, file.filename)
+        file.save(filepath)
+        current_video = file.filename
+        video_time = 0
+        video_state = "play"
+        socketio.emit("video_update", {"video": current_video, "time": video_time, "state": video_state})
+    return redirect(url_for("index"))
 
-# Потоковая передача видео
-@app.route('/video_feed')
-def video_feed():
-    video_path = os.path.join(app.config['UPLOAD_FOLDER'], 'video.mp4')  # Используем загруженное видео
-    return Response(
-        generate_video(video_path),
-        content_type='video/mp4',
-        headers={'Accept-Ranges': 'bytes'}
-    )
+@socketio.on("sync")
+def sync(data):
+    global video_time, video_state
+    video_time = data["time"]
+    video_state = data["state"]
+    emit("sync", data, broadcast=True, include_self=False)
 
-# Генератор для потоковой передачи видео
-def generate_video(video_path):
-    with open(video_path, 'rb') as f:
-        while True:
-            chunk = f.read(1024 * 1024)  # Читаем по 1 МБ
-            if not chunk:
-                break
-            yield chunk
-
-# Обработка WebSocket событий
-@socketio.on('playbackAction')
-def handle_playback_action(data):
-    emit('syncPlayback', data, broadcast=True, include_self=False)
-
-if __name__ == '__main__':
-    os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
-    socketio.run(app, debug=True, allow_unsafe_werkzeug=True, host='0.0.0.0')
+if __name__ == "__main__":
+    socketio.run(app, host="0.0.0.0", port=10000)  # Render требует открытый порт
