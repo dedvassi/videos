@@ -3,20 +3,19 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Синхронизированное видео</title>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.5.4/socket.io.js"></script>
-    <script src="{{ url_for('static', filename='main.js') }}" defer></script>
+    <title>Синхронное видео</title>
+    <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
+    <script src="{{ url_for('static', filename='main.js') }}"></script>
 </head>
 <body>
-    <h1>Общее видео</h1>
-    <video id="video" width="720" controls>
-        {% if video %}
-        <source src="{{ url_for('static', filename='uploads/' + video) }}" type="video/mp4">
-        {% endif %}
+    <h1>Видео для всех</h1>
+    <video id="videoPlayer" width="720" controls>
+        <source src="{{ video }}" type="video/mp4">
     </video>
+
     <form action="/upload" method="post" enctype="multipart/form-data">
-        <input type="file" name="video" accept="video/mp4">
-        <button type="submit">Загрузить видео</button>
+        <input type="file" name="file" accept="video/mp4">
+        <button type="submit">Загрузить новое видео</button>
     </form>
 </body>
 </html>
