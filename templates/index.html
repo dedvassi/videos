@@ -4,18 +4,70 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Синхронное видео</title>
-    <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
-    <script src="{{ url_for('static', filename='main.js') }}"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.5.4/socket.io.js"></script>
 </head>
 <body>
-    <h1>Видео для всех</h1>
-    <video id="videoPlayer" width="720" controls>
+
+    <h1>Синхронное видео</h1>
+
+    <video id="videoPlayer" width="640" height="360" controls>
         <source src="{{ video }}" type="video/mp4">
+        Ваш браузер не поддерживает видео.
     </video>
 
-    <form action="/upload" method="post" enctype="multipart/form-data">
-        <input type="file" name="file" accept="video/mp4">
-        <button type="submit">Загрузить новое видео</button>
+    <form id="uploadForm">
+        <input type="file" id="fileInput" accept="video/mp4">
+        <button type="submit">Загрузить видео</button>
     </form>
+
+    <script>
+        const socket = io();
+        const video = document.getElementById('videoPlayer');
+        const fileInput = document.getElementById('fileInput');
+        const uploadForm = document.getElementById('uploadForm');
+
+        // Когда приходит новое видео от сервера, обновляем источник
+        socket.on('video_changed', (data) => {
+            video.src = data.video_url;
+            video.load();
+            video.play();
+        });
+
+        // Отправка данных о состоянии видео (play/pause/seek)
+        function sendVideoState(eventType) {
+            socket.emit('video_control', {
+                event: eventType,
+                currentTime: video.currentTime
+            });
+        }
+
+        // Когда другой клиент изменяет видео, синхронизируем его
+        socket.on('sync_video', (data) => {
+            if (data.event === 'play') video.play();
+            if (data.event === 'pause') video.pause();
+            if (data.event === 'seek') video.currentTime = data.currentTime;
+        });
+
+        // События управления видео
+        video.addEventListener('play', () => sendVideoState('play'));
+        video.addEventListener('pause', () => sendVideoState('pause'));
+        video.addEventListener('seeked', () => sendVideoState('seek'));
+
+        // Загрузка нового видео
+        uploadForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const file = fileInput.files[0];
+            if (!file) return;
+
+            const formData = new FormData();
+            formData.append('video', file);
+
+            await fetch('/upload', {
+                method: 'POST',
+                body: formData
+            });
+        });
+    </script>
+
 </body>
 </html>
