@@ -36,10 +36,11 @@ def upload_video():
 @app.route('/video_feed')
 def video_feed():
     video_path = os.path.join(app.config['UPLOAD_FOLDER'], 'video.mp4')  # Используем загруженное видео
-    return Response(generate_video(video_path), {
-        'Content-Type': 'video/mp4',
-        'Accept-Ranges': 'bytes'
-    })
+    return Response(
+        generate_video(video_path),
+        content_type='video/mp4',
+        headers={'Accept-Ranges': 'bytes'}
+    )
 
 # Генератор для потоковой передачи видео
 def generate_video(video_path):
